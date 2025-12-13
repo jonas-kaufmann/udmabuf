@@ -1791,6 +1791,16 @@ static long udmabuf_device_file_ioctl(struct file* file, unsigned int cmd, unsig
     return (long)result;
 }
 
+#if defined(CONFIG_COMPAT) && (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 4))
+static long compat_ptr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	if (!file->f_op->unlocked_ioctl)
+		return -ENOIOCTLCMD;
+
+	return file->f_op->unlocked_ioctl(file, cmd, (unsigned long)compat_ptr(arg));
+}
+#endif
+
 #endif /* #if (IOCTL_VERSION > 0) */
 
 /**
