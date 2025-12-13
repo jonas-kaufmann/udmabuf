@@ -66,7 +66,7 @@ MODULE_DESCRIPTION("User space mappable DMA buffer device driver");
 MODULE_AUTHOR("ikwzm");
 MODULE_LICENSE("Dual BSD/GPL");
 
-#define DRIVER_VERSION     "5.3.1"
+#define DRIVER_VERSION     "5.4.0"
 #define DRIVER_NAME        "u-dma-buf"
 #define DEVICE_NAME_FORMAT "udmabuf%d"
 #define DEVICE_MAX_NUM      256
@@ -1806,6 +1806,9 @@ static const struct file_operations udmabuf_device_file_ops = {
     .llseek         = udmabuf_device_file_llseek,
 #if (IOCTL_VERSION > 0)
     .unlocked_ioctl = udmabuf_device_file_ioctl,
+#ifdef CONFIG_COMPAT
+    .compat_ioctl   = compat_ptr_ioctl,
+#endif
 #endif
 };
 
