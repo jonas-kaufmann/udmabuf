@@ -1806,7 +1806,9 @@ static const struct file_operations udmabuf_device_file_ops = {
     .llseek         = udmabuf_device_file_llseek,
 #if (IOCTL_VERSION > 0)
     .unlocked_ioctl = udmabuf_device_file_ioctl,
+#ifdef CONFIG_COMPAT
     .compat_ioctl   = compat_ptr_ioctl,
+#endif
 #endif
 };
 
