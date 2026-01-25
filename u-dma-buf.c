@@ -1,6 +1,6 @@
 /*********************************************************************************
  *
- *       Copyright (C) 2015-2025 Ichiro Kawazome
+ *       Copyright (C) 2015-2026 Ichiro Kawazome
  *       All rights reserved.
  * 
  *       Redistribution and use in source and binary forms, with or without
@@ -66,7 +66,7 @@ MODULE_DESCRIPTION("User space mappable DMA buffer device driver");
 MODULE_AUTHOR("ikwzm");
 MODULE_LICENSE("Dual BSD/GPL");
 
-#define DRIVER_VERSION     "5.4.1"
+#define DRIVER_VERSION     "5.4.2-RC1"
 #define DRIVER_NAME        "u-dma-buf"
 #define DEVICE_NAME_FORMAT "udmabuf%d"
 #define DEVICE_MAX_NUM      256
@@ -3721,7 +3721,7 @@ static void u_dma_buf_cleanup(void)
     udmabuf_device_list_cleanup();
     if (udmabuf_platform_driver_registerd){platform_driver_unregister(&udmabuf_platform_driver);}
     if (udmabuf_sys_class     != NULL    ){class_destroy(udmabuf_sys_class);}
-    if (udmabuf_device_number != 0       ){unregister_chrdev_region(udmabuf_device_number, 0);}
+    if (udmabuf_device_number != 0       ){unregister_chrdev_region(udmabuf_device_number, DEVICE_MAX_NUM);}
     ida_destroy(&udmabuf_device_ida);
 }
 
@@ -3757,7 +3757,7 @@ static int __init u_dma_buf_init(void)
     INIT_LIST_HEAD(&udmabuf_device_list);
     mutex_init(&udmabuf_device_list_sem);
 
-    retval = alloc_chrdev_region(&udmabuf_device_number, 0, 0, DRIVER_NAME);
+    retval = alloc_chrdev_region(&udmabuf_device_number, 0, DEVICE_MAX_NUM, DRIVER_NAME);
     if (retval != 0) {
         pr_err(DRIVER_NAME ": couldn't allocate device major number. return=%d\n", retval);
         udmabuf_device_number = 0;
