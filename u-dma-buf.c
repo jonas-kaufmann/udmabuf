@@ -66,7 +66,7 @@ MODULE_DESCRIPTION("User space mappable DMA buffer device driver");
 MODULE_AUTHOR("ikwzm");
 MODULE_LICENSE("Dual BSD/GPL");
 
-#define DRIVER_VERSION     "5.4.2-RC2"
+#define DRIVER_VERSION     "5.4.2-RC3"
 #define DRIVER_NAME        "u-dma-buf"
 #define DEVICE_NAME_FORMAT "udmabuf%d"
 #define DEVICE_MAX_NUM      256
@@ -1669,7 +1669,7 @@ static long udmabuf_device_file_ioctl(struct file* file, unsigned int cmd, unsig
         }
         case U_DMA_BUF_IOCTL_GET_DEV_INFO: {
             u_dma_buf_ioctl_dev_info dev_info = {0};
-            u64    dma_mask = *this->dma_dev->dma_mask;
+            u64    dma_mask = (this->dma_dev->dma_mask != NULL)? *this->dma_dev->dma_mask : 0;
             int    dma_mask_size = 0;
             u64    dma_mask_bit  = ((u64)1UL << dma_mask_size);
             while (dma_mask_size < 64) {
