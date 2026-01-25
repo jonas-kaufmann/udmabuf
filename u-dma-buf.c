@@ -1,6 +1,6 @@
 /*********************************************************************************
  *
- *       Copyright (C) 2015-2025 Ichiro Kawazome
+ *       Copyright (C) 2015-2026 Ichiro Kawazome
  *       All rights reserved.
  * 
  *       Redistribution and use in source and binary forms, with or without
@@ -66,7 +66,7 @@ MODULE_DESCRIPTION("User space mappable DMA buffer device driver");
 MODULE_AUTHOR("ikwzm");
 MODULE_LICENSE("Dual BSD/GPL");
 
-#define DRIVER_VERSION     "5.4.1"
+#define DRIVER_VERSION     "5.4.2"
 #define DRIVER_NAME        "u-dma-buf"
 #define DEVICE_NAME_FORMAT "udmabuf%d"
 #define DEVICE_MAX_NUM      256
@@ -843,7 +843,7 @@ static int udmabuf_object_mmap(struct udmabuf_object* this, struct vm_area_struc
     if (vma->vm_pgoff + vma_pages(vma) > (this->alloc_size >> PAGE_SHIFT))
         return -EINVAL;
 
-    if ((force_sync == true) | (this->sync_mode & SYNC_ALWAYS)) {
+    if ((force_sync == true) || ((this->sync_mode & SYNC_ALWAYS) != 0)) {
         switch (this->sync_mode & SYNC_MODE_MASK) {
             case SYNC_MODE_NONCACHED :
                 vm_flags_set(vma, VM_IO);
@@ -1403,6 +1403,7 @@ static ssize_t udmabuf_device_file_read(struct file* file, char __user* buff, si
     size_t                 remain_size;
     dma_addr_t             phys_addr;
     void*                  virt_addr;
+    bool                   need_sync;
 
     if (mutex_lock_interruptible(&this->sem))
         return -ERESTARTSYS;
@@ -1415,8 +1416,9 @@ static ssize_t udmabuf_device_file_read(struct file* file, char __user* buff, si
     phys_addr = this->phys_addr + *ppos;
     virt_addr = this->virt_addr + *ppos;
     xfer_size = (*ppos + count >= this->size) ? this->size - *ppos : count;
+    need_sync = (((file->f_flags & O_SYNC) != 0) || ((this->sync_mode & SYNC_ALWAYS) != 0));
 
-    if ((file->f_flags & O_SYNC) | (this->sync_mode & SYNC_ALWAYS))
+    if (need_sync == true)
         dma_sync_single_for_cpu(this->dma_dev, phys_addr, xfer_size, DMA_FROM_DEVICE);
 
     if ((remain_size = copy_to_user(buff, virt_addr, xfer_size)) != 0) {
@@ -1424,7 +1426,7 @@ static ssize_t udmabuf_device_file_read(struct file* file, char __user* buff, si
         goto return_unlock;
     }
 
-    if ((file->f_flags & O_SYNC) | (this->sync_mode & SYNC_ALWAYS))
+    if (need_sync == true)
         dma_sync_single_for_device(this->dma_dev, phys_addr, xfer_size, DMA_FROM_DEVICE);
 
     *ppos += xfer_size;
@@ -1450,6 +1452,7 @@ static ssize_t udmabuf_device_file_write(struct file* file, const char __user* b
     size_t                 remain_size;
     dma_addr_t             phys_addr;
     void*                  virt_addr;
+    bool                   need_sync;
 
     if (mutex_lock_interruptible(&this->sem))
         return -ERESTARTSYS;
@@ -1462,8 +1465,9 @@ static ssize_t udmabuf_device_file_write(struct file* file, const char __user* b
     phys_addr = this->phys_addr + *ppos;
     virt_addr = this->virt_addr + *ppos;
     xfer_size = (*ppos + count >= this->size) ? this->size - *ppos : count;
+    need_sync = (((file->f_flags & O_SYNC) != 0) || ((this->sync_mode & SYNC_ALWAYS) != 0));
 
-    if ((file->f_flags & O_SYNC) | (this->sync_mode & SYNC_ALWAYS))
+    if (need_sync == true)
         dma_sync_single_for_cpu(this->dma_dev, phys_addr, xfer_size, DMA_TO_DEVICE);
 
     if ((remain_size = copy_from_user(virt_addr, buff, xfer_size)) != 0) {
@@ -1471,7 +1475,7 @@ static ssize_t udmabuf_device_file_write(struct file* file, const char __user* b
         goto return_unlock;
     }
 
-    if ((file->f_flags & O_SYNC) | (this->sync_mode & SYNC_ALWAYS))
+    if (need_sync == true)
         dma_sync_single_for_device(this->dma_dev, phys_addr, xfer_size, DMA_TO_DEVICE);
 
     *ppos += xfer_size;
@@ -1665,7 +1669,7 @@ static long udmabuf_device_file_ioctl(struct file* file, unsigned int cmd, unsig
         }
         case U_DMA_BUF_IOCTL_GET_DEV_INFO: {
             u_dma_buf_ioctl_dev_info dev_info = {0};
-            u64    dma_mask = *this->dma_dev->dma_mask;
+            u64    dma_mask = (this->dma_dev->dma_mask != NULL)? *this->dma_dev->dma_mask : 0;
             int    dma_mask_size = 0;
             u64    dma_mask_bit  = ((u64)1UL << dma_mask_size);
             while (dma_mask_size < 64) {
@@ -3721,7 +3725,7 @@ static void u_dma_buf_cleanup(void)
     udmabuf_device_list_cleanup();
     if (udmabuf_platform_driver_registerd){platform_driver_unregister(&udmabuf_platform_driver);}
     if (udmabuf_sys_class     != NULL    ){class_destroy(udmabuf_sys_class);}
-    if (udmabuf_device_number != 0       ){unregister_chrdev_region(udmabuf_device_number, 0);}
+    if (udmabuf_device_number != 0       ){unregister_chrdev_region(udmabuf_device_number, DEVICE_MAX_NUM);}
     ida_destroy(&udmabuf_device_ida);
 }
 
@@ -3757,7 +3761,7 @@ static int __init u_dma_buf_init(void)
     INIT_LIST_HEAD(&udmabuf_device_list);
     mutex_init(&udmabuf_device_list_sem);
 
-    retval = alloc_chrdev_region(&udmabuf_device_number, 0, 0, DRIVER_NAME);
+    retval = alloc_chrdev_region(&udmabuf_device_number, 0, DEVICE_MAX_NUM, DRIVER_NAME);
     if (retval != 0) {
         pr_err(DRIVER_NAME ": couldn't allocate device major number. return=%d\n", retval);
         udmabuf_device_number = 0;
