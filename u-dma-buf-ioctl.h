@@ -31,6 +31,7 @@
 #ifndef  U_DMA_BUF_IOCTL_H
 #define  U_DMA_BUF_IOCTL_H
 #include <linux/ioctl.h>
+#include <stdint.h>
 
 #define DEFINE_U_DMA_BUF_IOCTL_FLAGS(name,type,lo,hi)                     \
 static const  int      U_DMA_BUF_IOCTL_FLAGS_ ## name ## _SHIFT = (lo);   \
